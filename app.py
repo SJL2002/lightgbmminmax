@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 # Load the LightGBM model using pickle
-model_path = 'models/lgbmodel.pkl'
+model_path = 'models/rfmodel.pkl'
 if not os.path.exists(model_path):
     st.error(f"Model file not found: {model_path}")
 else:
