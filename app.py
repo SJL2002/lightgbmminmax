@@ -2,9 +2,12 @@ import streamlit as st
 import pickle
 import numpy as np
 
-# Load the pre-trained model
-with open('lgbmodel.pkl', 'rb') as file:
-    model = pickle.load(file)
+model_path = 'models/lgbmodel.pkl'
+if not os.path.exists(model_path):
+    st.error(f"Model file not found: {model_path}")
+else:
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
 
 # Define mappings for categorical variables
 gender_map = {'Female': 0, 'Male': 1}
