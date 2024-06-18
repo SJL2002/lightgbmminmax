@@ -4,7 +4,7 @@ import joblib
 import os
 
 # Load the RandomForest model using joblib
-model_path = 'models/rfmodel.pkl'  # Adjust path as necessary
+model_path = 'rfmodel.pkl'  # Adjust path as necessary
 if not os.path.exists(model_path):
     st.error(f"Model file not found: {model_path}")
 else:
@@ -88,7 +88,7 @@ def main():
     # Page: Result
     elif st.session_state.page == 'result':
         st.header('Prediction Result')
-        st.write(f'Probability of stroke: {st.session_state.prediction:.2f}%')  # Display prediction result
+        st.write(f'Prediction: {st.session_state.prediction}')  # Display prediction result
         
         if st.button('Go back to input'):
             st.session_state.page = 'input'
