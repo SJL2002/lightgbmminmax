@@ -48,6 +48,10 @@ def predict_stroke_probability(gender, age, hypertension, heart_disease, ever_ma
     
     # Filter input data to include only the required features
     data = data[features_used]
+
+    # Debugging: Display input data
+    st.write("Input data for prediction:")
+    st.write(data)
     
     # Make prediction
     probability = model.predict_proba(data)[:, 1]  # Probability of stroke (class 1)
