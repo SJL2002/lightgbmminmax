@@ -1,7 +1,11 @@
 import streamlit as st
-import pickle
+import pandas as pd
 import numpy as np
+import pickle
+import os
+from lightgbm import LGBMClassifier
 
+# Load the LightGBM model using pickle
 model_path = 'models/lgbmodel.pkl'
 if not os.path.exists(model_path):
     st.error(f"Model file not found: {model_path}")
@@ -9,78 +13,103 @@ else:
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
 
-# Define mappings for categorical variables
-gender_map = {'Female': 0, 'Male': 1}
-hypertension_map = {'No': 0, 'Yes': 1}
-heart_disease_map = {'No': 0, 'Yes': 1}
-ever_married_map = {'No': 0, 'Yes': 1}
-work_type_map = {'Private': 0, 'Self-employed': 1, 'Govt_job': 2, 'Children': 3}
-residence_type_map = {'Urban': 0, 'Rural': 1}
-smoking_status_map = {'Never_smoked': 0, 'Formerly_smoked': 1, 'Smoked': 2}
-
-# Function to predict using the model
-def predict(features):
-    return model.predict_proba([features])[0][1]
-
-# Input function
-def user_input_features():
-    gender = st.sidebar.selectbox('Gender', list(gender_map.keys()))
-    age = st.sidebar.slider('Age', 0, 100, 50)
-    hypertension = st.sidebar.selectbox('Hypertension', list(hypertension_map.keys()))
-    heart_disease = st.sidebar.selectbox('Heart Disease', list(heart_disease_map.keys()))
-    ever_married = st.sidebar.selectbox('Ever Married', list(ever_married_map.keys()))
-    work_type = st.sidebar.selectbox('Work Type', list(work_type_map.keys()))
-    residence_type = st.sidebar.selectbox('Residence Type', list(residence_type_map.keys()))
-    avg_glucose_level = st.sidebar.slider('Average Glucose Level', 0.0, 300.0, 100.0)
-    bmi = st.sidebar.slider('BMI', 0.0, 50.0, 25.0)
-    smoking_status = st.sidebar.selectbox('Smoking Status', list(smoking_status_map.keys()))
-
-    data = {
-        'gender': gender_map[gender],
-        'age': age,
-        'hypertension': hypertension_map[hypertension],
-        'heart_disease': heart_disease_map[heart_disease],
-        'ever_married': ever_married_map[ever_married],
-        'work_type': work_type_map[work_type],
-        'residence_type': residence_type_map[residence_type],
-        'avg_glucose_level': avg_glucose_level,
-        'bmi': bmi,
-        'smoking_status': smoking_status_map[smoking_status]
-    }
+# Function to preprocess data and predict stroke probability
+def predict_stroke_probability(gender, age, hypertension, heart_disease, ever_married, work_type, residence_type,
+                                avg_glucose_level, bmi, smoking_status):
+    # Convert categorical variables to numeric using one-hot encoding
+    work_types = ['Private', 'Self-employed', 'Govt_job', 'children']
+    smoking_statuses = ['formerly smoked', 'never smoked', 'smokes']
     
-    features = list(data.values())
-    return np.array(features)
+    work_type_encoded = [1 if work_type == wt else 0 for wt in work_types]
+    smoking_status_encoded = [1 if smoking_status == ss else 0 for ss in smoking_statuses]
+    
+    # Create input DataFrame for prediction
+    data = pd.DataFrame({
+        'gender': [gender],
+        'age': [age],
+        'hypertension': [hypertension],
+        'heart_disease': [heart_disease],
+        'ever_married': [ever_married],
+        'Residence_type': [residence_type],
+        'avg_glucose_level': [avg_glucose_level],
+        'bmi': [bmi],
+        'work_type_Private': [work_type_encoded[0]],
+        'work_type_Self-employed': [work_type_encoded[1]],
+        'work_type_Govt_job': [work_type_encoded[2]],
+        'work_type_children': [work_type_encoded[3]],
+        'smoking_status_formerly smoked': [smoking_status_encoded[0]],
+        'smoking_status_never smoked': [smoking_status_encoded[1]],
+        'smoking_status_smokes': [smoking_status_encoded[2]],
+    })
+    
+    # Select only the features used during model training
+    features_used = ['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 'Residence_type',
+                     'avg_glucose_level', 'bmi', 'work_type_Private', 'smoking_status_formerly smoked']
+    
+    # Filter input data to include only the required features
+    data = data[features_used]
+    
+    # Make prediction
+    probability = model.predict_proba(data)[:, 1]  # Probability of stroke (class 1)
+    
+    # Multiply probability by 100
+    probability *= 100
+    return probability[0]
 
-st.title('Health Prediction App')
-
-# Page logic
+# Initialize session state variables
 if 'page' not in st.session_state:
     st.session_state.page = 'input'
+if 'probability' not in st.session_state:
+    st.session_state.probability = None
 
-# Input page
-if st.session_state.page == 'input':
-    st.header('Input Patient Information')
+def main():
+    # Page: Input
+    if st.session_state.page == 'input':
+        st.title('Stroke Probability Prediction')
+        st.write('This app predicts the probability of stroke based on input features.')
+        
+        # Input fields for user input
+        gender = st.selectbox('Gender', ['Male', 'Female'])
+        age = st.slider('Age', 0, 150, 50)
+        hypertension = st.checkbox('Hypertension')
+        heart_disease = st.checkbox('Heart Disease')
+        ever_married = st.selectbox('Ever Married', ['No', 'Yes'])
+        work_type = st.selectbox('Work Type', ['Private', 'Self-employed', 'Govt_job', 'children'])
+        residence_type = st.selectbox('Residence Type', ['Urban', 'Rural'])
+        avg_glucose_level = st.number_input('Average Glucose Level', min_value=50.0, max_value=500.0, value=100.0, step=0.1)
+        bmi = st.number_input('BMI', min_value=10.0, max_value=60.0, value=25.0, step=0.1)
+        smoking_status = st.selectbox('Smoking Status', ['formerly smoked', 'never smoked', 'smokes'])
+        
+        residence_num = 1 if residence_type == 'Urban' else 0
+        gender_num = 1 if gender == 'Male' else 0
+        ever_married_num = 1 if ever_married == 'Yes' else 0
+        
+        # Predict stroke probability when 'Predict' button is clicked
+        if st.button('Predict'):
+            probability = predict_stroke_probability(gender_num, age, hypertension, heart_disease, ever_married_num,
+                                                    work_type, residence_num, avg_glucose_level, bmi, smoking_status)
+            st.session_state.probability = probability
+            st.session_state.page = 'result'
 
-    features = user_input_features()
+    # Page: Result
+    elif st.session_state.page == 'result':
+        st.header('Prediction Result')
+        st.write(f'Probability of stroke: {st.session_state.probability:.2f}%')  # Display probability as percentage
+        
+        st.write("Was this result correct?")
+        if st.button('Yes'):
+            st.session_state.page = 'feedback'
+        if st.button('No'):
+            st.session_state.page = 'feedback'
 
-    if st.button('Predict'):
-        prediction = predict(features)
-        st.session_state.prediction = prediction
-        st.session_state.page = 'result'
+    # Page: Feedback
+    elif st.session_state.page == 'feedback':
+        st.header('Feedback')
+        st.write("Thank you for your feedback!")
+        st.write("You can go back to input to make another prediction.")
+        if st.button('Go back to input'):
+            st.session_state.page = 'input'
 
-# Result page
-if st.session_state.page == 'result':
-    st.header('Prediction Result')
-    st.write(f'The probability of the event is: {st.session_state.prediction:.2f}')
-
-    st.write('Was this prediction accurate?')
-    if st.button('Yes'):
-        st.session_state.page = 'feedback'
-    if st.button('No'):
-        st.session_state.page = 'feedback'
-
-# Feedback page
-if st.session_state.page == 'feedback':
-    st.header('Thank you for your feedback!')
-    if st.button('Go back to input'):
-        st.session_state.page = 'input'
+# Run the app
+if __name__ == '__main__':
+    main()
