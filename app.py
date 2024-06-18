@@ -4,7 +4,7 @@ import joblib
 import os
 
 # Load the RandomForest model using joblib
-model_path = 'rfmodel.pkl'  # Adjust path as necessary
+model_path = 'models/rfmodel.pkl'  # Adjust path as necessary
 if not os.path.exists(model_path):
     st.error(f"Model file not found: {model_path}")
 else:
